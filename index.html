@@ -96,6 +96,24 @@
   </div>
 
   <div class="tab-content" id="tab-history">
+    <div class="label">Add Weekly Price Update</div>
+    <div class="panel card" style="margin-top:10px; margin-bottom:24px;">
+      <div class="form-grid">
+        <div><div class="label">Date</div><input type="date" id="h-date"></div>
+        <div><div class="label">Gold 24KT</div><input type="number" id="h-g24" placeholder="0.00"></div>
+        <div><div class="label">Gold 22KT</div><input type="number" id="h-g22" placeholder="0.00"></div>
+        <div><div class="label">Gold 18KT</div><input type="number" id="h-g18" placeholder="0.00"></div>
+        <div><div class="label">Silver</div><input type="number" id="h-silver" placeholder="0.00"></div>
+      </div>
+      <button class="primary" onclick="submitPriceUpdate()">+ Add Entry via GitHub</button>
+      <div class="sub" style="margin-top:10px; line-height:1.5;">
+        This opens a pre-filled GitHub Issue in a new tab. Submitting it there triggers the
+        <span class="mono">ingest-price-entry</span> workflow, which writes the row into
+        <span class="mono">bullion_history.csv</span>, commits it, and closes the issue.
+        Reload this page ~20–30s after submitting to see it reflected.
+      </div>
+    </div>
+
     <div class="label">Historical Table (from bullion_history.csv — updated daily by GitHub Actions)</div>
     <div class="panel table-wrap" style="margin-top:10px;">
       <table id="history-table"></table>
@@ -334,6 +352,49 @@ function renderHistoryTable(series) {
   document.getElementById("history-table").innerHTML = `
     <thead><tr><th>Date</th><th>24KT</th><th>WoW</th><th>22KT</th><th>18KT</th><th>Silver</th><th>MoM (24K)</th></tr></thead>
     <tbody>${rows}</tbody>`;
+}
+
+// ---------- add weekly price update (via GitHub Issue -> Actions ingest) ----------
+function detectRepoCoords() {
+  // Standard GitHub Pages project-site URL: https://<owner>.github.io/<repo>/...
+  const host = location.hostname; // e.g. "yourusername.github.io"
+  const owner = host.endsWith(".github.io") ? host.split(".")[0] : null;
+  const pathParts = location.pathname.split("/").filter(Boolean);
+  const repo = pathParts.length ? pathParts[0] : "bullion-ledger";
+  return { owner, repo };
+}
+
+function submitPriceUpdate() {
+  const date = document.getElementById("h-date").value;
+  const g24 = document.getElementById("h-g24").value;
+  const g22 = document.getElementById("h-g22").value;
+  const g18 = document.getElementById("h-g18").value;
+  const silver = document.getElementById("h-silver").value;
+
+  if (!date || !g24 || !g22 || !g18 || !silver) {
+    showMsg("Fill in date and all four prices.", "error");
+    return;
+  }
+
+  const { owner, repo } = detectRepoCoords();
+  if (!owner) {
+    showMsg("Couldn't detect the GitHub owner from this URL — open the repo's Issues tab and file one manually using the format shown below.", "error");
+    return;
+  }
+
+  const title = `Price Update: ${date}`;
+  const body =
+`date: ${date}
+gold_24kt: ${g24}
+gold_22kt: ${g22}
+gold_18kt: ${g18}
+silver_per_gram: ${silver}
+
+_Opened from the Bullion Ledger dashboard. The ingest-price-entry workflow will parse this issue, add/update this date's row in bullion_history.csv, commit it, and close this issue automatically._`;
+
+  const url = `https://github.com/${owner}/${repo}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  window.open(url, "_blank");
+  showMsg(`Opening GitHub — review and click "Submit new issue" to add ${fmtDateDisp(date)} to the ledger.`, "success");
 }
 
 // ---------- purchases (localStorage) ----------

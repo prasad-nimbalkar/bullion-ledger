@@ -51,6 +51,35 @@ The workflow runs automatically every day at 06:00 UTC (11:30 AM IST).
 Each run overwrites *today's* row if the site's already been scraped once
 that day, so you always get one clean row per date — never duplicates.
 
+## 6. Add a manual weekly price update
+
+The **History** tab has an "Add Weekly Price Update" form. Since GitHub Pages
+is static and can't hold a write credential safely, it doesn't commit
+directly — instead:
+
+1. Fill in date + the four prices, click **Add Entry via GitHub**.
+2. A new tab opens with a pre-filled GitHub Issue titled `Price Update: YYYY-MM-DD`.
+   You need to be logged into GitHub. Click **Submit new issue**.
+3. The `ingest-price-entry.yml` workflow fires automatically, parses the
+   issue body, writes/updates that date's row in `bullion_history.csv`,
+   commits it, comments "✅ done" on the issue, and closes it.
+4. Reload the dashboard ~20–30 seconds later — the new entry is in the chart
+   and history table.
+
+You can also file that issue by hand (skip the dashboard) as long as the
+title starts with `Price Update:` and the body has these lines:
+
+```
+date: 2026-08-23
+gold_24kt: 15400
+gold_22kt: 14250
+gold_18kt: 11800
+silver_per_gram: 238
+```
+
+If a submission is malformed, the workflow comments on the issue explaining
+what it expected, instead of closing it silently.
+
 ## Notes
 
 - **Purchases** you log on the dashboard are saved in your browser's

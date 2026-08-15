@@ -1,0 +1,97 @@
+name: Ingest Manual Price Entry
+
+# Triggered when someone submits an issue titled "Price Update: YYYY-MM-DD"
+# (created automatically by the "Add Weekly Price Update" form on the dashboard,
+# or filed by hand in the same format). Parses the issue body, writes/updates
+# that date's row in bullion_history.csv, commits it, and closes the issue.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  ingest:
+    if: startsWith(github.event.issue.title, 'Price Update:')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+
+      - name: Parse issue body and update CSV
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = context.payload.issue.body || "";
+
+            const get = (key) => {
+              const m = body.match(new RegExp(key + "\\s*:\\s*([^\\r\\n]+)", "i"));
+              return m ? m[1].trim() : null;
+            };
+
+            const date = get("date");
+            const g24 = get("gold_24kt");
+            const g22 = get("gold_22kt");
+            const g18 = get("gold_18kt");
+            const silver = get("silver_per_gram");
+
+            const isValidDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date);
+            const nums = [g24, g22, g18, silver];
+            const allNumeric = nums.every(v => v !== null && !isNaN(parseFloat(v)));
+
+            if (!isValidDate || !allNumeric) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body: "⚠️ Could not parse this entry. Expected lines:\n```\ndate: YYYY-MM-DD\ngold_24kt: <number>\ngold_22kt: <number>\ngold_18kt: <number>\nsilver_per_gram: <number>\n```\nEdit the issue body to match this format and reopen it, or file a new issue titled `Price Update: YYYY-MM-DD`."
+              });
+              core.setOutput("success", "false");
+              return;
+            }
+
+            const csvPath = "bullion_history.csv";
+            const lines = fs.readFileSync(csvPath, "utf8").trim().split("\n");
+            const header = lines[0];
+            let rows = lines.slice(1).filter(Boolean).map(l => l.split(","));
+
+            const nowIso = new Date().toISOString();
+            const newRow = [date, nowIso, "manual entry", g24, g22, g18, silver, "", ""];
+
+            const idx = rows.findIndex(r => r[0] === date);
+            if (idx >= 0) rows[idx] = newRow; else rows.push(newRow);
+            rows.sort((a, b) => a[0].localeCompare(b[0]));
+
+            fs.writeFileSync(csvPath, [header, ...rows.map(r => r.join(","))].join("\n") + "\n");
+
+            core.setOutput("success", "true");
+            core.setOutput("entry_date", date);
+
+      - name: Commit updated CSV
+        if: steps.parse.outputs.success == 'true'
+        run: |
+          git config user.name "bullion-ledger-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add bullion_history.csv
+          git commit -m "Manual price entry for ${{ steps.parse.outputs.entry_date }} (closes issue #${{ github.event.issue.number }})"
+          git push
+
+      - name: Comment and close issue
+        if: steps.parse.outputs.success == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: `✅ Added to bullion_history.csv for ${{ steps.parse.outputs.entry_date }} and pushed to the ledger.`
+            });
+            await github.rest.issues.update({
+              ...context.repo,
+              issue_number: context.issue.number,
+              state: "closed"
+            });
