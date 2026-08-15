@@ -21,9 +21,11 @@ bullion-ledger/
 ├── scrape_rates.py
 ├── requirements.txt
 ├── bullion_history.csv
+├── README.md
 └── .github/
     └── workflows/
-        └── scrape-rates.yml
+        ├── scrape-rates.yml
+        └── ingest-price-entry.yml
 ```
 
 ## 2. Let Actions write to the repo
