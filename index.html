@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bullion Ledger</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -172,25 +172,42 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
 });
 
 // ---------- helpers ----------
-function fmtDateDisp(iso) { const [y,m,d] = iso.split("-"); return `${d}-${m}-${y}`; }
-function fmtINR(n, dec=0) { if (n===null||n===undefined||isNaN(n)) return "—";
-  return "₹" + Number(n).toLocaleString("en-IN", {maximumFractionDigits:dec, minimumFractionDigits:dec}); }
-function fmtPct(n) { if (n===null||n===undefined||isNaN(n)) return "—"; return (n>0?"+":"") + n.toFixed(2) + "%"; }
+function fmtDateDisp(iso) { 
+  if (!iso || !iso.includes("-")) return iso || "—";
+  const [y,m,d] = iso.split("-"); 
+  return `${d}-${m}-${y}`; 
+}
+
+function fmtINR(n, dec=0) { 
+  if (n===null||n===undefined||isNaN(n)) return "—";
+  return "₹" + Number(n).toLocaleString("en-IN", {maximumFractionDigits:dec, minimumFractionDigits:dec}); 
+}
+
+function fmtPct(n) { 
+  if (n===null||n===undefined||isNaN(n)) return "—"; 
+  return (n>0?"+":"") + n.toFixed(2) + "%"; 
+}
+
 function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
 function pctChange(curr, prev){ if(!prev) return null; return ((curr-prev)/prev)*100; }
+
 function showMsg(text, type) {
   document.getElementById("msg-box").innerHTML = `<div class="msg ${type}">${text}</div>`;
   setTimeout(()=>{ document.getElementById("msg-box").innerHTML=""; }, 4000);
 }
 
-// ---------- CSV parsing ----------
+// ---------- robust CSV parsing ----------
 function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
-  const headers = lines[0].split(",");
+  const lines = text.replace(/\r\n/g, "\n").trim().split("\n");
+  if (lines.length < 2) return [];
+  
+  const headers = lines[0].split(",").map(h => h.trim());
+  
   return lines.slice(1).filter(l => l.trim()).map(line => {
-    const cells = line.split(",");
+    const cells = line.split(",").map(c => c.trim());
     const obj = {};
-    headers.forEach((h,i) => obj[h.trim()] = (cells[i] ?? "").trim());
+    headers.forEach((h, i) => { obj[h] = cells[i] ?? ""; });
+    
     return {
       date: obj.date,
       g24: parseFloat(obj.gold_24kt),
@@ -201,7 +218,7 @@ function parseCSV(text) {
   }).filter(r => r.date && !isNaN(r.g24));
 }
 
-// ---------- analytics (mirrors the original tracker logic) ----------
+// ---------- analytics ----------
 function computeSeries(history) {
   const metals = ["g24","g22","g18","silver"];
   const running = {}; metals.forEach(m => running[m] = {ath:-Infinity, atl:Infinity});
@@ -209,8 +226,10 @@ function computeSeries(history) {
     const prev = idx>0 ? history[idx-1] : null;
     const momEntry = (() => {
       let best=null, bestDiff=Infinity;
-      for (let i=0;i<idx;i++){ const gap=daysBetween(history[i].date, entry.date);
-        if (gap>=24 && gap<=40){ const diff=Math.abs(gap-32); if(diff<bestDiff){bestDiff=diff; best=history[i];} } }
+      for (let i=0;i<idx;i++){ 
+        const gap=daysBetween(history[i].date, entry.date);
+        if (gap>=24 && gap<=40){ const diff=Math.abs(gap-32); if(diff<bestDiff){bestDiff=diff; best=history[i];} } 
+      }
       return best;
     })();
     const wow={}, mom={}, isNewHigh={}, isNewLow={};
@@ -225,6 +244,7 @@ function computeSeries(history) {
     return {...entry, wow, mom, isNewHigh, isNewLow};
   });
 }
+
 function trendLabel(history, metal, n) {
   const slice = history.slice(-Math.min(n, history.length));
   if (slice.length<2) return {label:"Insufficient data", dir:"flat"};
@@ -232,6 +252,7 @@ function trendLabel(history, metal, n) {
   let dir = "flat"; if (pct>0.5) dir="up"; else if (pct<-0.5) dir="down";
   return {label: dir==="up"?"Uptrend":dir==="down"?"Downtrend":"Sideways", dir, pct};
 }
+
 function valuationForMetal(history, metal) {
   if (history.length<2) return {label:"Fair Value", percentile:50, confidence:30};
   const vals = history.map(e=>e[metal]);
@@ -243,6 +264,7 @@ function valuationForMetal(history, metal) {
   const confidence = Math.min(95, Math.round(30 + history.length*4));
   return {label, percentile, confidence};
 }
+
 function recommendation(valLabel, trend) {
   const map = {"Very Cheap":"Strong Buy","Cheap":"Buy","Fair Value":"Hold","Expensive":"Wait for Dip","Very Expensive":"Avoid Buying Now"};
   let action = map[valLabel] || "Hold";
@@ -250,6 +272,7 @@ function recommendation(valLabel, trend) {
   if (valLabel==="Fair Value" && trend.dir==="up") action="Buy";
   return action;
 }
+
 function actionColor(action) {
   if (action==="Strong Buy") return "#6E8F5C";
   if (action==="Buy") return "#C9A227";
@@ -354,10 +377,9 @@ function renderHistoryTable(series) {
     <tbody>${rows}</tbody>`;
 }
 
-// ---------- add weekly price update (via GitHub Issue -> Actions ingest) ----------
+// ---------- add weekly price update ----------
 function detectRepoCoords() {
-  // Standard GitHub Pages project-site URL: https://<owner>.github.io/<repo>/...
-  const host = location.hostname; // e.g. "yourusername.github.io"
+  const host = location.hostname;
   const owner = host.endsWith(".github.io") ? host.split(".")[0] : null;
   const pathParts = location.pathname.split("/").filter(Boolean);
   const repo = pathParts.length ? pathParts[0] : "bullion-ledger";
@@ -378,23 +400,14 @@ function submitPriceUpdate() {
 
   const { owner, repo } = detectRepoCoords();
   if (!owner) {
-    showMsg("Couldn't detect the GitHub owner from this URL — open the repo's Issues tab and file one manually using the format shown below.", "error");
+    showMsg("Couldn't detect the GitHub owner from this URL — open the repo's Issues tab manually.", "error");
     return;
   }
 
   const title = `Price Update: ${date}`;
-  const body =
-`date: ${date}
-gold_24kt: ${g24}
-gold_22kt: ${g22}
-gold_18kt: ${g18}
-silver_per_gram: ${silver}
-
-_Opened from the Bullion Ledger dashboard. The ingest-price-entry workflow will parse this issue, add/update this date's row in bullion_history.csv, commit it, and close this issue automatically._`;
-
+  const body = `date: ${date}\ngold_24kt: ${g24}\ngold_22kt: ${g22}\ngold_18kt: ${g18}\nsilver_per_gram: ${silver}`;
   const url = `https://github.com/${owner}/${repo}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
   window.open(url, "_blank");
-  showMsg(`Opening GitHub — review and click "Submit new issue" to add ${fmtDateDisp(date)} to the ledger.`, "success");
 }
 
 // ---------- purchases (localStorage) ----------
@@ -440,7 +453,6 @@ function renderPurchases() {
     <div class="panel card"><div class="label">Return %</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;color:${gain>=0?'#6E8F5C':'#B4553B'}">${gainPct!==null?fmtPct(gainPct):"—"}</div></div>`;
 
   if (!withPL.length) {
-    document.getElementById("purchase-table").innerHTML = "";
     document.querySelector("#purchase-table").closest(".panel").innerHTML = `<div class="empty">No purchases logged yet.</div>`;
     return;
   }
@@ -457,17 +469,29 @@ function renderPurchases() {
     <tbody>${rows}</tbody>`;
 }
 
-// ---------- init: fetch CSV same-origin ----------
+// ---------- init ----------
 async function init() {
+  if (window.location.protocol === "file:") {
+    document.getElementById("header-sub").textContent = "file:// access blocked";
+    document.getElementById("ticker-row").innerHTML = `
+      <div class="empty" style="padding:16px;">
+        <strong>Local File Detected:</strong> Browsers block <code>fetch()</code> requests on local files.
+        <br>Please serve this folder using a local server (e.g., <code>python3 -m http.server 8000</code>) or push to GitHub Pages.
+      </div>`;
+    return;
+  }
+
   try {
     const res = await fetch("./bullion_history.csv", { cache: "no-store" });
-    if (!res.ok) throw new Error("CSV not found yet");
+    if (!res.ok) throw new Error("CSV file not found");
     const text = await res.text();
     HISTORY = parseCSV(text).sort((a,b)=>a.date.localeCompare(b.date));
-    if (!HISTORY.length) throw new Error("CSV is empty");
+    if (!HISTORY.length) throw new Error("No valid rows found in bullion_history.csv");
+    
     const series = computeSeries(HISTORY);
     document.getElementById("header-sub").textContent =
       `${HISTORY.length} daily ${HISTORY.length===1?"entry":"entries"} · since ${fmtDateDisp(HISTORY[0].date)} · last updated ${fmtDateDisp(HISTORY[HISTORY.length-1].date)}`;
+    
     renderTicker(series);
     renderCharts(series);
     renderValuation(series);
@@ -475,13 +499,14 @@ async function init() {
     renderHistoryTable(series);
     renderPurchases();
   } catch (err) {
-    document.getElementById("header-sub").textContent = "waiting for first scrape…";
+    document.getElementById("header-sub").textContent = "data loading error";
     document.getElementById("ticker-row").innerHTML = `<div class="empty" style="padding:16px;">
-      No data yet. Run the "Daily Bullion Rate Scrape" workflow once (Actions tab → Run workflow),
-      then reload this page. (${err.message})</div>`;
+      Unable to load data (${err.message}). Make sure <code>bullion_history.csv</code> exists in the same folder and contains rows.</div>`;
   }
 }
+
 init();
 </script>
+
 </body>
 </html>
