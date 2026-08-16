@@ -67,6 +67,7 @@
   .msg.success { background:rgba(110,143,92,0.12); border:1px solid var(--sage); color:var(--sage); }
   .action-pill { text-align:center; padding:7px 0; font-size:12.5px; font-weight:600; border-radius:3px; margin-top:6px; }
   .empty { color:var(--cream-dim); font-size:13px; padding:14px; }
+  #sync-modal-overlay.open { display: flex !important; }
 </style>
 </head>
 <body>
@@ -124,24 +125,47 @@
     <div class="label">Log a Purchase</div>
     <div class="panel card" style="margin-top:10px; margin-bottom:24px;">
       <div class="form-grid">
-        <div><div class="label">Date</div><input type="date" id="p-date"></div>
-        <div><div class="label">Asset</div>
-          <select id="p-asset">
-            <option>Gold</option>
-            <option>Silver</option>
+        <div>
+          <div class="label">Date</div>
+          <input type="date" id="p-date" onchange="autoFillHistoricalRate()">
+        </div>
+        <div>
+          <div class="label">Asset</div>
+          <select id="p-asset" onchange="onAssetOrPurityChange()">
+            <option value="Gold">Gold</option>
+            <option value="Silver">Silver</option>
           </select>
         </div>
-        <div id="p-purity-wrap"><div class="label">Purity</div>
-          <select id="p-purity">
+        <div id="p-purity-wrap">
+          <div class="label">Purity</div>
+          <select id="p-purity" onchange="autoFillHistoricalRate()">
             <option value="24K">24K</option>
             <option value="22K">22K</option>
             <option value="18K">18K</option>
           </select>
         </div>
-        <div><div class="label">Quantity (g)</div><input type="number" id="p-qty" placeholder="0.00"></div>
-        <div><div class="label">Price / g</div><input type="number" id="p-price" placeholder="0.00"></div>
+        <div>
+          <div class="label">Price / g (₹)</div>
+          <input type="number" id="p-price" placeholder="0.00" step="0.01" oninput="calcFromPricePerGram()">
+        </div>
+        <div>
+          <div class="label">Total Paid (₹)</div>
+          <input type="number" id="p-total-price" placeholder="0.00" step="0.01" oninput="calcFromTotal()">
+        </div>
+        <div>
+          <div class="label">Quantity (g)</div>
+          <input type="number" id="p-qty" placeholder="0.00" step="0.001" oninput="calcFromQty()">
+        </div>
       </div>
+      <div id="p-rate-hint" style="font-size:11px; color:var(--cream-dim); margin-top:8px; min-height:16px;"></div>
       <button class="primary" onclick="addPurchase()">+ Log Purchase</button>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <button class="primary" style="background:var(--panel2); color:var(--gold-bright); border:1px solid var(--hairline);"
+              onclick="openSyncSettings()">⚙ Sync Settings</button>
+      <button class="primary" style="background:var(--panel2); color:var(--silver-bright); border:1px solid var(--hairline); margin-left:8px;"
+              onclick="manualPull()">⇄ Pull from Gist</button>
     </div>
 
     <div class="label">Portfolio Summary</div>
@@ -152,40 +176,143 @@
       <table id="purchase-table"></table>
     </div>
   </div>
+
+  <!-- EDIT PURCHASE MODAL -->
+  <div id="edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:1000;">
+    <div class="panel card" style="width:100%; max-width:500px; border-radius:6px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <span class="label" style="font-size:14px; color:var(--gold-bright);">Edit Purchase Entry</span>
+        <button onclick="closeEditModal()" style="background:transparent; border:none; color:var(--cream-dim); font-size:18px; cursor:pointer;">&times;</button>
+      </div>
+      <input type="hidden" id="edit-id">
+      <div class="form-grid">
+        <div>
+          <div class="label">Date</div>
+          <input type="date" id="edit-date" onchange="autoFillEditHistoricalRate()">
+        </div>
+        <div>
+          <div class="label">Asset</div>
+          <select id="edit-asset" onchange="onEditAssetOrPurityChange()">
+            <option value="Gold">Gold</option>
+            <option value="Silver">Silver</option>
+          </select>
+        </div>
+        <div id="edit-purity-wrap">
+          <div class="label">Purity</div>
+          <select id="edit-purity" onchange="autoFillEditHistoricalRate()">
+            <option value="24K">24K</option>
+            <option value="22K">22K</option>
+            <option value="18K">18K</option>
+          </select>
+        </div>
+        <div>
+          <div class="label">Price / g (₹)</div>
+          <input type="number" id="edit-price" step="0.01" oninput="recalcEdit('price')">
+          <small id="edit-rate-hint" style="font-size:11px; color:var(--cream-dim); display:block; margin-top:4px;"></small>
+        </div>
+        <div>
+          <div class="label">Total Paid (₹)</div>
+          <input type="number" id="edit-total" step="0.01" oninput="recalcEdit('total')">
+        </div>
+        <div>
+          <div class="label">Quantity (g)</div>
+          <input type="number" id="edit-qty" step="0.001" oninput="recalcEdit('qty')">
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end;">
+        <button onclick="closeEditModal()" style="background:transparent; border:1px solid var(--hairline); color:var(--cream); padding:8px 16px; border-radius:3px; cursor:pointer;">Cancel</button>
+        <button class="primary" style="margin-top:0;" onclick="saveEditedPurchase()">Save Changes</button>
+      </div>
+    </div>
+  </div>
 </main>
+
+<!-- ============ Gist Sync Settings Modal ============ -->
+<div id="sync-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+  <div class="panel" style="width:min(420px, 92vw); padding:20px; max-height:88vh; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <span style="font-family:'Fraunces',serif; font-size:17px; color:var(--gold-bright);">Cross-Device Sync</span>
+      <a href="#" onclick="closeSyncSettings(); return false;" style="color:var(--cream-dim); font-size:18px; text-decoration:none;">✕</a>
+    </div>
+
+    <div class="sub" style="line-height:1.5; margin-bottom:14px;">
+      Purchases stay encrypted (AES-256-GCM) before ever leaving this browser.
+      GitHub only ever sees ciphertext. Use a Fine-Grained PAT scoped to
+      <strong>Gists: Read and write</strong> only — nothing else.
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div class="label">GitHub Fine-Grained PAT</div>
+      <input type="password" id="sync-pat" placeholder="github_pat_...">
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div class="label">Gist ID (leave blank to create a new one)</div>
+      <input type="text" id="sync-gist-id" placeholder="auto-filled after first push">
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div class="label">Sync Passphrase</div>
+      <input type="password" id="sync-passphrase" placeholder="can be the same as your unlock password">
+    </div>
+
+    <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--cream-dim); margin:12px 0;">
+      <input type="checkbox" id="sync-remember" style="width:auto; margin:0;">
+      Remember PAT on this device (stores it in localStorage — only enable on a
+      device you trust; otherwise you'll re-enter it each session)
+    </label>
+
+    <div id="sync-status" style="font-size:12px; color:var(--cream-dim); min-height:18px; margin-bottom:10px;"></div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="primary" onclick="saveSyncSettings()">Save Settings</button>
+      <button class="primary" style="background:var(--panel2); color:var(--cream);" onclick="pushToGist(true)">Push Now</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const COLORS = { g24: "#E4C158", g22: "#C9A227", g18: "#C98A3B", silver: "#D8DCE2" };
 const METAL_LABELS = { g24: "Gold 24KT", g22: "Gold 22KT", g18: "Gold 18KT", silver: "Silver" };
 let HISTORY = [];
-let purchases = JSON.parse(localStorage.getItem("bullion-ledger:purchases") || "[]");
 let charts = {};
 
-// ---------- tabs ----------
+// ---------- AES-256 SECURE PURCHASES LEDGER STATE ----------
+let purchasesDecrypted = null;
+let activeMasterKey = null;
+
+// ---------- TAB MANAGEMENT & LOCK GATE ----------
 document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", async (e) => {
+    const targetTab = btn.dataset.tab;
+
+    if (targetTab === "purchases") {
+      const unlocked = await unlockPurchases();
+      if (!unlocked) return;
+    }
+
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
     btn.classList.add("active");
-    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    document.getElementById("tab-" + targetTab).classList.add("active");
   });
 });
 
-// ---------- helpers ----------
-function fmtDateDisp(iso) { 
+// ---------- HELPERS ----------
+function fmtDateDisp(iso) {
   if (!iso || !iso.includes("-")) return iso || "—";
-  const [y,m,d] = iso.split("-"); 
-  return `${d}-${m}-${y}`; 
+  const [y,m,d] = iso.split("-");
+  return `${d}-${m}-${y}`;
 }
 
-function fmtINR(n, dec=0) { 
+function fmtINR(n, dec=0) {
   if (n===null||n===undefined||isNaN(n)) return "—";
-  return "₹" + Number(n).toLocaleString("en-IN", {maximumFractionDigits:dec, minimumFractionDigits:dec}); 
+  return "₹" + Number(n).toLocaleString("en-IN", {maximumFractionDigits:dec, minimumFractionDigits:dec});
 }
 
-function fmtPct(n) { 
-  if (n===null||n===undefined||isNaN(n)) return "—"; 
-  return (n>0?"+":"") + n.toFixed(2) + "%"; 
+function fmtPct(n) {
+  if (n===null||n===undefined||isNaN(n)) return "—";
+  return (n>0?"+":"") + n.toFixed(2) + "%";
 }
 
 function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
@@ -196,18 +323,18 @@ function showMsg(text, type) {
   setTimeout(()=>{ document.getElementById("msg-box").innerHTML=""; }, 4000);
 }
 
-// ---------- robust CSV parsing ----------
+// ---------- CSV PARSING ----------
 function parseCSV(text) {
   const lines = text.replace(/\r\n/g, "\n").trim().split("\n");
   if (lines.length < 2) return [];
-  
+
   const headers = lines[0].split(",").map(h => h.trim());
-  
+
   return lines.slice(1).filter(l => l.trim()).map(line => {
     const cells = line.split(",").map(c => c.trim());
     const obj = {};
     headers.forEach((h, i) => { obj[h] = cells[i] ?? ""; });
-    
+
     return {
       date: obj.date,
       g24: parseFloat(obj.gold_24kt),
@@ -218,7 +345,95 @@ function parseCSV(text) {
   }).filter(r => r.date && !isNaN(r.g24));
 }
 
-// ---------- analytics ----------
+// ---------- AUTO-CALCULATION & LOOKUP HELPERS ----------
+// NOTE: patched version — clears stale price on a failed lookup, and reports
+// the ACTUAL matched date when falling back to the nearest prior date,
+// instead of silently reusing the selected date's value/label.
+function getHistoricalRate(dateStr, asset, purity) {
+  if (!HISTORY || !HISTORY.length || !dateStr) return null;
+
+  const match = HISTORY.slice().reverse().find(row => row.date <= dateStr);
+  if (!match) return null;
+
+  let rate = null;
+  if (asset === "Silver") rate = match.silver;
+  else if (purity === "24K") rate = match.g24;
+  else if (purity === "22K") rate = match.g22;
+  else if (purity === "18K") rate = match.g18;
+
+  if (rate === null || isNaN(rate)) return null;
+  return { rate, matchedDate: match.date };
+}
+
+function autoFillHistoricalRate() {
+  const date = document.getElementById("p-date").value;
+  const asset = document.getElementById("p-asset").value;
+  const purity = document.getElementById("p-purity").value;
+  const hintEl = document.getElementById("p-rate-hint");
+  const priceEl = document.getElementById("p-price");
+
+  const result = getHistoricalRate(date, asset, purity);
+
+  if (result) {
+    priceEl.value = result.rate.toFixed(2);
+    if (result.matchedDate === date) {
+      hintEl.textContent = `Ledger rate on ${fmtDateDisp(date)}: ₹${result.rate.toLocaleString("en-IN")}/g`;
+      hintEl.style.color = "var(--cream-dim)";
+    } else {
+      hintEl.textContent = `No rate for ${fmtDateDisp(date)} — using nearest prior date, ${fmtDateDisp(result.matchedDate)}: ₹${result.rate.toLocaleString("en-IN")}/g`;
+      hintEl.style.color = "#C98A3B";
+    }
+    calcFromPricePerGram();
+  } else {
+    priceEl.value = "";
+    document.getElementById("p-qty").value = "";
+    document.getElementById("p-total-price").value = "";
+    hintEl.textContent = date ? "No ledger rate found on or before this date — add an entry under History first." : "";
+    hintEl.style.color = "#B4553B";
+  }
+}
+
+function onAssetOrPurityChange() {
+  const asset = document.getElementById("p-asset").value;
+  document.getElementById("p-purity-wrap").style.display = asset === "Silver" ? "none" : "block";
+  autoFillHistoricalRate();
+}
+
+function calcFromTotal() {
+  const total = parseFloat(document.getElementById("p-total-price").value);
+  const pricePerG = parseFloat(document.getElementById("p-price").value);
+  const qtyInput = document.getElementById("p-qty");
+
+  if (!isNaN(total) && !isNaN(pricePerG) && pricePerG > 0) {
+    qtyInput.value = (total / pricePerG).toFixed(3);
+  }
+}
+
+function calcFromQty() {
+  const qty = parseFloat(document.getElementById("p-qty").value);
+  const pricePerG = parseFloat(document.getElementById("p-price").value);
+  const totalInput = document.getElementById("p-total-price");
+
+  if (!isNaN(qty) && !isNaN(pricePerG)) {
+    totalInput.value = (qty * pricePerG).toFixed(2);
+  }
+}
+
+function calcFromPricePerGram() {
+  const pricePerG = parseFloat(document.getElementById("p-price").value);
+  const total = parseFloat(document.getElementById("p-total-price").value);
+  const qty = parseFloat(document.getElementById("p-qty").value);
+
+  if (!isNaN(pricePerG) && pricePerG > 0) {
+    if (!isNaN(total)) {
+      document.getElementById("p-qty").value = (total / pricePerG).toFixed(3);
+    } else if (!isNaN(qty)) {
+      document.getElementById("p-total-price").value = (qty * pricePerG).toFixed(2);
+    }
+  }
+}
+
+// ---------- ANALYTICS ----------
 function computeSeries(history) {
   const metals = ["g24","g22","g18","silver"];
   const running = {}; metals.forEach(m => running[m] = {ath:-Infinity, atl:Infinity});
@@ -226,9 +441,9 @@ function computeSeries(history) {
     const prev = idx>0 ? history[idx-1] : null;
     const momEntry = (() => {
       let best=null, bestDiff=Infinity;
-      for (let i=0;i<idx;i++){ 
+      for (let i=0;i<idx;i++){
         const gap=daysBetween(history[i].date, entry.date);
-        if (gap>=24 && gap<=40){ const diff=Math.abs(gap-32); if(diff<bestDiff){bestDiff=diff; best=history[i];} } 
+        if (gap>=24 && gap<=40){ const diff=Math.abs(gap-32); if(diff<bestDiff){bestDiff=diff; best=history[i];} }
       }
       return best;
     })();
@@ -281,7 +496,7 @@ function actionColor(action) {
   return "#B4553B";
 }
 
-// ---------- render ----------
+// ---------- RENDER DASHBOARD PANELS ----------
 function renderTicker(series) {
   const latest = series[series.length-1];
   const metals = ["g24","g22","g18","silver"];
@@ -377,7 +592,7 @@ function renderHistoryTable(series) {
     <tbody>${rows}</tbody>`;
 }
 
-// ---------- add weekly price update ----------
+// ---------- PRICE UPDATE VIA GITHUB ISSUES ----------
 function detectRepoCoords() {
   const host = location.hostname;
   const owner = host.endsWith(".github.io") ? host.split(".")[0] : null;
@@ -410,41 +625,310 @@ function submitPriceUpdate() {
   window.open(url, "_blank");
 }
 
-// ---------- purchases (localStorage) ----------
-document.getElementById("p-asset").addEventListener("change", e => {
-  document.getElementById("p-purity-wrap").style.display = e.target.value === "Silver" ? "none" : "block";
-});
+// ---------- AES-256 CRYPTOGRAPHIC FUNCTIONS ----------
+const PBKDF2_ITERATIONS = 600000;
 
-function addPurchase() {
+async function getCryptoKey(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptData(dataArray, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await getCryptoKey(password, salt);
+  const enc = new TextEncoder();
+
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv }, key, enc.encode(JSON.stringify(dataArray))
+  );
+
+  return JSON.stringify({
+    salt: Array.from(salt),
+    iv: Array.from(iv),
+    data: Array.from(new Uint8Array(ciphertext))
+  });
+}
+
+async function decryptData(encryptedJsonStr, password) {
+  const { salt, iv, data } = JSON.parse(encryptedJsonStr);
+  const key = await getCryptoKey(password, new Uint8Array(salt));
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: new Uint8Array(iv) }, key, new Uint8Array(data)
+  );
+
+  return JSON.parse(new TextDecoder().decode(decrypted));
+}
+
+// ---------- SECURE PURCHASES & LOCKING LOGIC ----------
+
+async function unlockPurchases() {
+  if (purchasesDecrypted !== null) return true;
+
+  const rawEncrypted = localStorage.getItem("bullion-ledger:purchases_enc");
+  const oldPlaintext = localStorage.getItem("bullion-ledger:purchases");
+
+  if (!rawEncrypted) {
+    const pass1 = prompt("Set a Master Password for your Purchases Ledger:");
+    if (!pass1) return false;
+
+    const pass2 = prompt("Confirm your Master Password:");
+    if (pass1 !== pass2) {
+      alert("Passwords do not match. Setup cancelled.");
+      return false;
+    }
+
+    let initialData = [];
+    if (oldPlaintext) {
+      try {
+        const legacyData = JSON.parse(oldPlaintext);
+        if (Array.isArray(legacyData) && legacyData.length > 0) {
+          if (confirm(`Migrate ${legacyData.length} existing unencrypted purchase record(s)?`)) {
+            initialData = legacyData;
+          }
+        }
+      } catch(e) {}
+      localStorage.removeItem("bullion-ledger:purchases");
+    }
+
+    purchasesDecrypted = initialData;
+    activeMasterKey = pass1;
+    await savePurchasesEncrypted();
+    renderPurchases();
+    return true;
+  }
+
+  const password = prompt("Enter Master Password to unlock Purchases:");
+  if (!password) return false;
+
+  try {
+    purchasesDecrypted = await decryptData(rawEncrypted, password);
+    activeMasterKey = password;
+
+    if (oldPlaintext) {
+      localStorage.removeItem("bullion-ledger:purchases");
+    }
+
+    renderPurchases();
+    return true;
+  } catch (err) {
+    alert("Incorrect password or corrupted ciphertext.");
+    return false;
+  }
+}
+
+async function savePurchasesEncrypted() {
+  if (!activeMasterKey || purchasesDecrypted === null) return;
+  const cipherPayload = await encryptData(purchasesDecrypted, activeMasterKey);
+  localStorage.setItem("bullion-ledger:purchases_enc", cipherPayload);
+}
+
+function lockPurchases() {
+  purchasesDecrypted = null;
+  activeMasterKey = null;
+
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+
+  const overviewBtn = document.querySelector('[data-tab="overview"]');
+  if (overviewBtn) overviewBtn.classList.add("active");
+  document.getElementById("tab-overview")?.classList.add("active");
+
+  showMsg("Purchases ledger locked and memory purged.", "success");
+}
+
+async function addPurchase() {
+  if (purchasesDecrypted === null) {
+    showMsg("Purchases ledger is locked.", "error");
+    return;
+  }
+
   const date = document.getElementById("p-date").value;
   const asset = document.getElementById("p-asset").value;
   const purity = asset === "Silver" ? "Fine" : document.getElementById("p-purity").value;
   const qty = parseFloat(document.getElementById("p-qty").value);
   const price = parseFloat(document.getElementById("p-price").value);
-  if (!date || !qty || !price) { showMsg("Fill in date, quantity and price.", "error"); return; }
-  purchases.push({ id: "p-"+Date.now(), date, asset, purity, qty, price, total: qty*price });
-  purchases.sort((a,b)=>a.date.localeCompare(b.date));
-  localStorage.setItem("bullion-ledger:purchases", JSON.stringify(purchases));
-  document.getElementById("p-qty").value=""; document.getElementById("p-price").value="";
+  const total = parseFloat(document.getElementById("p-total-price").value) || (qty * price);
+
+  if (!date || isNaN(qty) || isNaN(price)) {
+    showMsg("Please fill in Date, Price/g, and Quantity or Total Paid.", "error");
+    return;
+  }
+
+  purchasesDecrypted.push({
+    id: "p-" + Date.now(),
+    date,
+    asset,
+    purity,
+    qty,
+    price,
+    total
+  });
+
+  purchasesDecrypted.sort((a, b) => a.date.localeCompare(b.date));
+  await savePurchasesEncrypted();
+  pushToGist(); // auto-sync to Gist (no-op / silent skip if sync isn't configured yet)
+
+  document.getElementById("p-qty").value = "";
+  document.getElementById("p-price").value = "";
+  document.getElementById("p-total-price").value = "";
+  document.getElementById("p-rate-hint").textContent = "";
+
   showMsg(`Logged purchase on ${fmtDateDisp(date)}.`, "success");
   renderPurchases();
 }
 
+// ---------- EDIT & DELETE LOGIC ----------
+
+async function deletePurchase(id) {
+  if (!confirm("Are you sure you want to delete this log entry?")) return;
+  purchasesDecrypted = purchasesDecrypted.filter(p => p.id !== id);
+  await savePurchasesEncrypted();
+  renderPurchases();
+  showMsg("Entry deleted successfully.", "success");
+}
+
+function openEditModal(id) {
+  const item = purchasesDecrypted.find(p => p.id === id);
+  if (!item) return;
+
+  document.getElementById("edit-id").value = item.id;
+  document.getElementById("edit-date").value = item.date;
+  document.getElementById("edit-asset").value = item.asset;
+  
+  onEditAssetOrPurityChange();
+  if (item.asset === "Gold") {
+    document.getElementById("edit-purity").value = item.purity || "22K";
+  }
+
+  document.getElementById("edit-price").value = item.price;
+  document.getElementById("edit-total").value = item.total;
+  document.getElementById("edit-qty").value = item.qty;
+
+  document.getElementById("edit-modal").style.display = "flex";
+}
+
+function closeEditModal() {
+  document.getElementById("edit-modal").style.display = "none";
+}
+
+function onEditAssetOrPurityChange() {
+  const asset = document.getElementById("edit-asset").value;
+  const wrap = document.getElementById("edit-purity-wrap");
+  if (wrap) {
+    wrap.style.visibility = (asset === "Silver") ? "hidden" : "visible";
+  }
+  autoFillEditHistoricalRate();
+}
+
+function autoFillEditHistoricalRate() {
+  const date = document.getElementById("edit-date").value;
+  const asset = document.getElementById("edit-asset").value;
+  const purityEl = document.getElementById("edit-purity");
+  const purity = (asset === "Silver") ? "Fine" : (purityEl ? purityEl.value : "24K");
+  const hintEl = document.getElementById("edit-rate-hint");
+
+  const result = getHistoricalRate(date, asset, purity); // now returns { rate, matchedDate }
+
+  if (result) {
+    document.getElementById("edit-price").value = result.rate.toFixed(2);
+    if (hintEl) {
+      if (result.matchedDate === date) {
+        hintEl.textContent = `Ledger rate on ${fmtDateDisp(date)}: ₹${result.rate.toLocaleString("en-IN")}/g`;
+      } else {
+        hintEl.textContent = `No rate for ${fmtDateDisp(date)} — using nearest prior date, ${fmtDateDisp(result.matchedDate)}: ₹${result.rate.toLocaleString("en-IN")}/g`;
+      }
+    }
+    recalcEdit("price");
+  } else if (hintEl) {
+    hintEl.textContent = date ? "No ledger rate found on or before this date." : "";
+  }
+}
+
+function recalcEdit(changedField) {
+  const priceInput = document.getElementById("edit-price");
+  const totalInput = document.getElementById("edit-total");
+  const qtyInput = document.getElementById("edit-qty");
+
+  const price = parseFloat(priceInput.value);
+  const total = parseFloat(totalInput.value);
+  const qty = parseFloat(qtyInput.value);
+
+  if (changedField === "price") {
+    if (!isNaN(price) && price > 0) {
+      if (!isNaN(total) && total > 0) {
+        qtyInput.value = (total / price).toFixed(3);
+      } else if (!isNaN(qty) && qty > 0) {
+        totalInput.value = (qty * price).toFixed(2);
+      }
+    }
+  } else if (changedField === "total") {
+    if (!isNaN(total) && !isNaN(price) && price > 0) {
+      qtyInput.value = (total / price).toFixed(3);
+    }
+  } else if (changedField === "qty") {
+    if (!isNaN(qty) && !isNaN(price) && price > 0) {
+      totalInput.value = (qty * price).toFixed(2);
+    }
+  }
+}
+
+async function saveEditedPurchase() {
+  const id = document.getElementById("edit-id").value;
+  const date = document.getElementById("edit-date").value;
+  const asset = document.getElementById("edit-asset").value;
+  const purityEl = document.getElementById("edit-purity");
+  const purity = asset === "Silver" ? "Fine" : (purityEl ? purityEl.value : "24K");
+
+  let qty = parseFloat(document.getElementById("edit-qty").value);
+  let price = parseFloat(document.getElementById("edit-price").value);
+  let total = parseFloat(document.getElementById("edit-total").value);
+
+  if (!date || isNaN(qty) || isNaN(price) || isNaN(total)) {
+    alert("Please fill in valid numerical values.");
+    return;
+  }
+
+  const idx = purchasesDecrypted.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    purchasesDecrypted[idx] = { id, date, asset, purity, qty, price, total };
+    purchasesDecrypted.sort((a, b) => a.date.localeCompare(b.date));
+    await savePurchasesEncrypted();
+    renderPurchases();
+    closeEditModal();
+    showMsg("Purchase entry updated.", "success");
+  }
+}
+
 function renderPurchases() {
-  const latest = HISTORY.length ? computeSeries(HISTORY)[HISTORY.length-1] : null;
-  const purityToKey = {"24K":"g24","22K":"g22","18K":"g18","Fine":"silver"};
-  const withPL = purchases.map(p => {
+  if (purchasesDecrypted === null) return;
+
+  const latest = HISTORY.length ? computeSeries(HISTORY)[HISTORY.length - 1] : null;
+  const purityToKey = { "24K": "g24", "22K": "g22", "18K": "g18", "Fine": "silver" };
+
+  const withPL = purchasesDecrypted.map(p => {
     const key = purityToKey[p.purity] || "g24";
     const currentPrice = latest ? latest[key] : null;
-    const currentValue = currentPrice ? currentPrice*p.qty : null;
-    const pl = currentValue!==null ? currentValue-p.total : null;
-    const retPct = currentValue!==null ? (pl/p.total)*100 : null;
-    return {...p, currentPrice, currentValue, pl, retPct};
+    const currentValue = currentPrice ? currentPrice * p.qty : null;
+    const pl = currentValue !== null ? currentValue - p.total : null;
+    const retPct = currentValue !== null ? (pl / p.total) * 100 : null;
+    return { ...p, currentPrice, currentValue, pl, retPct };
   });
-  const totalInvested = withPL.reduce((s,p)=>s+p.total,0);
-  const currentValue = withPL.reduce((s,p)=>s+(p.currentValue||0),0);
-  const gain = currentValue-totalInvested;
-  const gainPct = totalInvested ? (gain/totalInvested)*100 : null;
+
+  const totalInvested = withPL.reduce((s, p) => s + p.total, 0);
+  const currentValue = withPL.reduce((s, p) => s + (p.currentValue || 0), 0);
+  const gain = currentValue - totalInvested;
+  const gainPct = totalInvested ? (gain / totalInvested) * 100 : null;
 
   document.getElementById("portfolio-summary").innerHTML = `
     <div class="panel card"><div class="label">Total Invested</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;">${fmtINR(totalInvested)}</div></div>
@@ -452,10 +936,12 @@ function renderPurchases() {
     <div class="panel card"><div class="label">Unrealized P/L</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;color:${gain>=0?'#6E8F5C':'#B4553B'}">${fmtINR(gain)}</div></div>
     <div class="panel card"><div class="label">Return %</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;color:${gain>=0?'#6E8F5C':'#B4553B'}">${gainPct!==null?fmtPct(gainPct):"—"}</div></div>`;
 
+  const container = document.querySelector("#purchase-table")?.closest(".panel");
   if (!withPL.length) {
-    document.querySelector("#purchase-table").closest(".panel").innerHTML = `<div class="empty">No purchases logged yet.</div>`;
+    if (container) container.innerHTML = `<div class="empty">No purchases logged yet. <a href="#" onclick="lockPurchases(); return false;" style="color:#C98A3B; margin-left: 10px;">🔒 Lock tab</a></div>`;
     return;
   }
+
   const rows = withPL.slice().reverse().map(p => `
     <tr>
       <td>${fmtDateDisp(p.date)}</td><td>${p.asset}</td><td>${p.purity}</td><td>${p.qty}</td>
@@ -463,13 +949,183 @@ function renderPurchases() {
       <td>${p.currentPrice?fmtINR(p.currentPrice,2):"—"}</td>
       <td style="color:${p.pl>=0?'#6E8F5C':'#B4553B'}">${p.pl!==null?fmtINR(p.pl):"—"}</td>
       <td style="color:${p.retPct>=0?'#6E8F5C':'#B4553B'}">${p.retPct!==null?fmtPct(p.retPct):"—"}</td>
+      <td>
+        <button onclick="openEditModal('${p.id}')" style="background:transparent; border:1px solid var(--gold); color:var(--gold); padding:2px 6px; font-size:10px; cursor:pointer; border-radius:2px; margin-right:4px;">Edit</button>
+        <button onclick="deletePurchase('${p.id}')" style="background:transparent; border:1px solid var(--rust); color:var(--rust); padding:2px 6px; font-size:10px; cursor:pointer; border-radius:2px;">Del</button>
+      </td>
     </tr>`).join("");
-  document.getElementById("purchase-table").innerHTML = `
-    <thead><tr><th>Date</th><th>Asset</th><th>Purity</th><th>Qty(g)</th><th>Buy ₹/g</th><th>Total</th><th>Current ₹/g</th><th>P/L</th><th>Return %</th></tr></thead>
-    <tbody>${rows}</tbody>`;
+
+  if (container) {
+    container.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span class="label">Purchase History</span>
+        <a href="#" onclick="lockPurchases(); return false;" style="color:#C98A3B; font-size:12px; text-decoration:none;">🔒 Lock this tab</a>
+      </div>
+      <table id="purchase-table">
+        <thead><tr><th>Date</th><th>Asset</th><th>Purity</th><th>Qty(g)</th><th>Buy ₹/g</th><th>Total</th><th>Current ₹/g</th><th>P/L</th><th>Return %</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
 }
 
-// ---------- init ----------
+// ================= GIST CROSS-DEVICE SYNC =================
+const GIST_FILENAME = "bullion_ledger.enc";
+let syncPAT = localStorage.getItem("bullion-ledger:sync-pat") || null;
+let syncGistId = localStorage.getItem("bullion-ledger:sync-gist-id") || null;
+let syncPassphrase = null; // memory-only, never persisted
+
+function openSyncSettings() {
+  document.getElementById("sync-gist-id").value = syncGistId || "";
+  document.getElementById("sync-pat").value = syncPAT || "";
+  document.getElementById("sync-remember").checked = !!localStorage.getItem("bullion-ledger:sync-pat");
+  document.getElementById("sync-modal-overlay").classList.add("open");
+}
+function closeSyncSettings() {
+  document.getElementById("sync-modal-overlay").classList.remove("open");
+}
+
+function syncStatus(text, isError) {
+  const el = document.getElementById("sync-status");
+  el.textContent = text;
+  el.style.color = isError ? "var(--rust)" : "var(--sage)";
+}
+
+function saveSyncSettings() {
+  const pat = document.getElementById("sync-pat").value.trim();
+  const gistId = document.getElementById("sync-gist-id").value.trim();
+  const pass = document.getElementById("sync-passphrase").value;
+  const remember = document.getElementById("sync-remember").checked;
+
+  if (!pat || !pass) {
+    syncStatus("PAT and passphrase are both required.", true);
+    return;
+  }
+
+  syncPAT = pat;
+  syncGistId = gistId || null;
+  syncPassphrase = pass;
+
+  if (remember) {
+    localStorage.setItem("bullion-ledger:sync-pat", pat);
+  } else {
+    localStorage.removeItem("bullion-ledger:sync-pat");
+  }
+  if (syncGistId) {
+    localStorage.setItem("bullion-ledger:sync-gist-id", syncGistId);
+  }
+
+  syncStatus("Settings saved for this session.", false);
+}
+
+async function pushToGist(showUI) {
+  if (!syncPAT || !syncPassphrase) {
+    if (showUI) syncStatus("Set your PAT and passphrase first (Sync Settings).", true);
+    return;
+  }
+  if (purchasesDecrypted === null) {
+    if (showUI) syncStatus("Unlock the Purchases ledger first.", true);
+    return;
+  }
+
+  try {
+    const cipherPayload = await encryptData(purchasesDecrypted, syncPassphrase);
+    const body = {
+      description: "Bullion Ledger — encrypted purchase sync (do not edit manually)",
+      public: false,
+      files: { [GIST_FILENAME]: { content: cipherPayload } }
+    };
+
+    const url = syncGistId
+      ? `https://api.github.com/gists/${syncGistId}`
+      : `https://api.github.com/gists`;
+    const method = syncGistId ? "PATCH" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Authorization": `token ${syncPAT}`,
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`GitHub API ${res.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    if (!syncGistId) {
+      syncGistId = data.id;
+      localStorage.setItem("bullion-ledger:sync-gist-id", syncGistId);
+      const gistIdEl = document.getElementById("sync-gist-id");
+      if (gistIdEl) gistIdEl.value = syncGistId;
+    }
+
+    if (showUI) syncStatus(`Pushed successfully. Gist ID: ${syncGistId}`, false);
+    else showMsg("Synced to Gist.", "success");
+  } catch (err) {
+    console.error("pushToGist failed:", err);
+    if (showUI) syncStatus(`Push failed: ${err.message}`, true);
+    else showMsg(`Sync failed: ${err.message}`, "error");
+  }
+}
+
+async function pullFromGist() {
+  if (!syncPAT || !syncGistId || !syncPassphrase) {
+    throw new Error("PAT, Gist ID, and passphrase must all be set first.");
+  }
+
+  const res = await fetch(`https://api.github.com/gists/${syncGistId}`, {
+    headers: {
+      "Authorization": `token ${syncPAT}`,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  });
+  if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+
+  const data = await res.json();
+  const file = data.files[GIST_FILENAME];
+  if (!file) throw new Error(`No ${GIST_FILENAME} file found in that Gist.`);
+
+  let content = file.content;
+  if (file.truncated) {
+    const rawRes = await fetch(file.raw_url);
+    content = await rawRes.text();
+  }
+
+  const remoteData = await decryptData(content, syncPassphrase);
+
+  const localById = new Map(purchasesDecrypted.map(p => [p.id, p]));
+  remoteData.forEach(p => localById.set(p.id, p));
+  purchasesDecrypted = Array.from(localById.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+  await savePurchasesEncrypted();
+  renderPurchases();
+  return remoteData.length;
+}
+
+async function manualPull() {
+  if (purchasesDecrypted === null) {
+    const unlocked = await unlockPurchases();
+    if (!unlocked) return;
+  }
+  if (!syncPassphrase) {
+    syncPassphrase = prompt("Enter your sync passphrase:");
+    if (!syncPassphrase) return;
+  }
+  try {
+    const count = await pullFromGist();
+    showMsg(`Pulled and merged ${count} record(s) from Gist.`, "success");
+  } catch (err) {
+    showMsg(`Pull failed: ${err.message}`, "error");
+  }
+}
+
+// ---------- INITIALIZATION ----------
 async function init() {
   if (window.location.protocol === "file:") {
     document.getElementById("header-sub").textContent = "file:// access blocked";
@@ -482,22 +1138,21 @@ async function init() {
   }
 
   try {
-    const res = await fetch("./bullion_history.csv", { cache: "no-store" });
+    const res = await fetch("./bullion_history.csv?v=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("CSV file not found");
     const text = await res.text();
     HISTORY = parseCSV(text).sort((a,b)=>a.date.localeCompare(b.date));
     if (!HISTORY.length) throw new Error("No valid rows found in bullion_history.csv");
-    
+
     const series = computeSeries(HISTORY);
     document.getElementById("header-sub").textContent =
       `${HISTORY.length} daily ${HISTORY.length===1?"entry":"entries"} · since ${fmtDateDisp(HISTORY[0].date)} · last updated ${fmtDateDisp(HISTORY[HISTORY.length-1].date)}`;
-    
+
     renderTicker(series);
     renderCharts(series);
     renderValuation(series);
     renderOpportunities(series);
     renderHistoryTable(series);
-    renderPurchases();
   } catch (err) {
     document.getElementById("header-sub").textContent = "data loading error";
     document.getElementById("ticker-row").innerHTML = `<div class="empty" style="padding:16px;">
