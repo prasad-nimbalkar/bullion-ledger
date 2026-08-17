@@ -78,6 +78,7 @@
     <span class="sub" id="header-sub">loading…</span>
   </div>
   <div class="tabs">
+    <button class="tab-btn" data-tab="docs">Docs</button>
     <button class="tab-btn active" data-tab="overview">Overview</button>
     <button class="tab-btn" data-tab="history">History</button>
     <button class="tab-btn" data-tab="purchases">Purchases</button>
@@ -105,6 +106,7 @@
         <div><div class="label">Gold 22KT</div><input type="number" id="h-g22" placeholder="0.00"></div>
         <div><div class="label">Gold 18KT</div><input type="number" id="h-g18" placeholder="0.00"></div>
         <div><div class="label">Silver</div><input type="number" id="h-silver" placeholder="0.00"></div>
+        <button class="tab-btn" data-tab="docs">Docs</button>
       </div>
       <button class="primary" onclick="submitPriceUpdate()">+ Add Entry via GitHub</button>
       <div class="sub" style="margin-top:10px; line-height:1.5;">
@@ -224,6 +226,152 @@
         <button class="primary" style="margin-top:0;" onclick="saveEditedPurchase()">Save Changes</button>
       </div>
     </div>
+  </div>
+
+  <!-- DOCUMENTATION & USER GUIDE -->
+  <div class="tab-content" id="tab-docs">
+      <div style="border-bottom: 1px solid var(--hairline); padding-bottom: 12px; margin-bottom: 20px;">
+        <div style="font-size: 18px; font-weight: 600; color: var(--gold-bright);">Bullion Ledger Guide</div>
+        <div style="font-size: 12px; color: var(--cream-dim); margin-top: 4px;">
+          An open-source, private gold and silver portfolio tracker powered by automated daily price feeds.
+        </div>
+      </div>
+
+      <!-- Getting Started -->
+      <div class="panel card" style="margin-bottom:16px;">
+        <div style="margin-bottom: 24px;">
+          <div style="font-family:'Fraunces',serif; font-size: 16px; font-weight: 600; color: var(--gold-bright); margin-bottom: 12px;">
+            Getting Started in 3 Easy Steps
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+            <div style="background: var(--panel2); border: 1px solid var(--hairline); padding: 14px; border-radius: 4px;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--gold-bright); margin-bottom: 6px;">1. Create Master Password</div>
+              <div style="font-size: 12px; color: var(--cream-dim); line-height: 1.5;">
+                Navigate to the <strong>Purchases</strong> tab and set a master password. This initializes your client-side AES-256 encrypted database.
+              </div>
+            </div>
+
+            <div style="background: var(--panel2); border: 1px solid var(--hairline); padding: 14px; border-radius: 4px;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--gold-bright); margin-bottom: 6px;">2. Log Physical Holdings</div>
+              <div style="font-size: 12px; color: var(--cream-dim); line-height: 1.5;">
+                Add purchase records (Date, Asset, Purity, Weight, Total Cost). Historical market rates auto-fill when you select a past date.
+              </div>
+            </div>
+
+            <div style="background: var(--panel2); border: 1px solid var(--hairline); padding: 14px; border-radius: 4px;">
+              <div style="font-size: 13px; font-weight: 600; color: var(--gold-bright); margin-bottom: 6px;">3. Track Profit & Valuation</div>
+              <div style="font-size: 12px; color: var(--cream-dim); line-height: 1.5;">
+                View real-time total portfolio value, overall profit/loss, and historical rate comparison charts on your Dashboard.
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <span style="font-family:'Fraunces',serif; font-size:16px; color:var(--gold-bright);">Summmary, in short</span>
+        <ol class="sub" style="line-height:1.8; margin-top:10px; font-size:13px; padding-left:18px;">
+          <li>Check the <strong>Overview</strong> tab for today's prices and calls.</li>
+          <li>Browse or extend price history under <strong>History</strong>.</li>
+          <li>Open <strong>Purchases</strong>, set a password once, and start logging what you've bought.</li>
+          <li>Come back anytime — the scraper keeps prices current on its own.</li>
+        </ol>
+      </div>
+
+      <div class="panel card" style="margin-bottom:16px;">
+        <span style="font-family:'Fraunces',serif; font-size:18px; color:var(--gold-bright);">What is Bullion Ledger?</span>
+        <p class="sub" style="line-height:1.6; margin-top:10px; font-size:13px;">
+          A free, self-updating tracker for gold &amp; silver prices, built to run
+          entirely on GitHub with no server and no PC left running. A GitHub
+          Actions workflow scrapes daily rates and commits them to
+          <span class="mono">bullion_history.csv</span> in this repo; GitHub Pages
+          serves this dashboard, which reads that CSV directly and renders the
+          charts, valuation calls, and your personal purchase log.
+        </p>
+      </div>
+
+      <div class="panel card" style="margin-bottom:16px;">
+        <span style="font-family:'Fraunces',serif; font-size:16px; color:var(--gold-bright);">Overview tab</span>
+        <p class="sub" style="line-height:1.6; margin-top:10px; font-size:13px;">
+          Current price for each metal with week-over-week change, ATH/ATL
+          badges, trend charts, and a per-metal call — Strong Buy through
+          Avoid Buying Now — based on where today's price sits in its full
+          historical range (percentile-based, not financial advice).
+        </p>
+      </div>
+
+      <div class="panel card" style="margin-bottom:16px;">
+        <span style="font-family:'Fraunces',serif; font-size:16px; color:var(--gold-bright);">History tab</span>
+        <p class="sub" style="line-height:1.6; margin-top:10px; font-size:13px;">
+          The full price table the scraper has built up, plus a form to add a
+          rate manually for a date the scraper missed (holiday, site outage,
+          etc). Submitting that form opens a pre-filled GitHub Issue — click
+          <strong>Submit new issue</strong> there and an automated workflow
+          writes it into the CSV within seconds. You'll need to be logged
+          into GitHub for that step.
+        </p>
+      </div>
+
+      <div class="panel card" style="margin-bottom:16px;">
+        <span style="font-family:'Fraunces',serif; font-size:16px; color:var(--gold-bright);">Purchases tab</span>
+        <p class="sub" style="line-height:1.6; margin-top:10px; font-size:13px;">
+          Your personal investment log — kept separate from the public price
+          data. First time you open it, you'll set a master password; your
+          entries are then encrypted (AES-256) before being saved, so nothing
+          readable sits in your browser at rest. Pick a Date, Asset, and
+          Purity and the day's rate fills in automatically from the ledger;
+          enter either Quantity or Total Paid and the other calculates for
+          you. Every entry can be edited later, and <strong>🔒 Lock this
+          tab</strong> clears your session immediately.
+          <br><br>
+          <strong>Forgetting your password means that data can't be recovered</strong>
+          — there's no backdoor by design, so keep your password somewhere safe.
+        </p>
+      </div>
+
+
+      <div class="panel card" style="margin-bottom:16px;">
+        <!-- Key Features Overview -->
+        <div style="margin-bottom: 24px;">
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold); margin-bottom: 10px;">
+            Key System Features
+          </div>
+          <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; table-layout: fixed;">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--hairline); color: var(--cream-dim);">
+                  <th style="padding: 8px 4px; width: 35%; min-width: 120px;">Feature</th>
+                  <th style="padding: 8px 4px; width: 65%;">Description</th>
+                </tr>
+              </thead>
+              <tbody style="color: var(--cream);">
+                <tr style="border-bottom: 1px solid var(--hairline);">
+                  <td style="padding: 8px 4px; font-weight: 600; color: var(--gold-bright); vertical-align: top; word-wrap: break-word;">Automated Scraper</td>
+                  <td style="padding: 8px 4px; line-height: 1.5; vertical-align: top;">GitHub Actions fetches prices automatically every morning (06:00 UTC/11:30 IST) and commits clean records to CSV.</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--hairline);">
+                  <td style="padding: 8px 4px; font-weight: 600; color: var(--gold-bright); vertical-align: top; word-wrap: break-word;">AES-256 Encryption</td>
+                  <td style="padding: 8px 4px; line-height: 1.5; vertical-align: top;">All personal holdings are encrypted in your local browser storage using PBKDF2 key derivation.</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--hairline);">
+                  <td style="padding: 8px 4px; font-weight: 600; color: var(--gold-bright); vertical-align: top; word-wrap: break-word;">Manual Price Updates</td>
+                  <td style="padding: 8px 4px; line-height: 1.5; vertical-align: top;">Submit missing historical rates directly through the <strong>History</strong> tab using automated GitHub Issues.</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--hairline);">
+                  <td style="padding: 8px 4px; font-weight: 600; color: var(--gold-bright); vertical-align: top; word-wrap: break-word;">Interactive Management</td>
+                  <td style="padding: 8px 4px; line-height: 1.5; vertical-align: top;">Edit or delete purchase entries anytime via the modal dialog with automated math recalculations.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Privacy Security Callout -->
+        <div style="background: rgba(228, 193, 88, 0.05); border: 1px solid var(--hairline); padding: 12px 16px; border-radius: 4px; font-size: 12px; color: var(--cream-dim); line-height: 1.5;">
+          <strong style="color: var(--gold-bright);">🔒 Privacy & Security Guarantee:</strong> 
+          Your financial records remain strictly inside your device's browser memory (`localStorage`). No personal purchase details, quantities, or financial figures are sent to GitHub or any cloud server.
+        </div>
+      </div>
+
   </div>
 </main>
 
