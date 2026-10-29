@@ -184,6 +184,55 @@
  
   </div>
 
+  <div class="tab-content" id="tab-purchases">
+  <div class="label">Log a Purchase</div>
+  <div class="panel card" style="margin-top:10px; margin-bottom:24px;">
+    <div class="form-grid">
+      <div>
+        <div class="label">Date</div>
+        <input type="date" id="p-date" onchange="autoFillHistoricalRate()">
+      </div>
+      <div>
+        <div class="label">Asset</div>
+        <select id="p-asset" onchange="onAssetOrPurityChange()">
+          <option value="Gold">Gold</option>
+          <option value="Silver">Silver</option>
+        </select>
+      </div>
+      <div id="p-purity-wrap">
+        <div class="label">Purity</div>
+        <select id="p-purity" onchange="autoFillHistoricalRate()">
+          <option value="24K">24K</option>
+          <option value="22K">22K</option>
+          <option value="18K">18K</option>
+        </select>
+      </div>
+      <div>
+        <div class="label">Price / g (₹)</div>
+        <input type="number" id="p-price" placeholder="0.00" step="0.01" oninput="calcFromPricePerGram()">
+      </div>
+      <div>
+        <div class="label">Total Paid (₹)</div>
+        <input type="number" id="p-total-price" placeholder="0.00" step="0.01" oninput="calcFromTotal()">
+      </div>
+      <div>
+        <div class="label">Quantity (g)</div>
+        <input type="number" id="p-qty" placeholder="0.00" step="0.001" oninput="calcFromQty()">
+      </div>
+    </div>
+    <small id="p-rate-hint" style="font-size:11px; color:var(--cream-dim); display:block; margin-top:8px;"></small>
+    <button class="primary" onclick="addPurchase()">+ Log Purchase</button>
+  </div>
+
+  <div class="label">Portfolio Summary</div>
+  <div id="portfolio-summary" class="val-bar" style="margin-top:10px; margin-bottom:24px;"></div>
+
+  <div class="label">Purchase History</div>
+  <div id="purchase-history-panel" class="panel table-wrap" style="margin-top:10px;">
+    <table id="purchase-table"></table>
+  </div>
+  </div>
+
   <!-- EDIT PURCHASE MODAL -->
   <div id="edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:1000;">
     <div class="panel card" style="width:100%; max-width:500px; border-radius:6px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
@@ -1201,7 +1250,7 @@ function renderPurchases() {
     <div class="panel card"><div class="label">Unrealized P/L</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;color:${gain>=0?'#6E8F5C':'#B4553B'}">${fmtINR(gain)}</div></div>
     <div class="panel card"><div class="label">Return %</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;color:${gain>=0?'#6E8F5C':'#B4553B'}">${gainPct!==null?fmtPct(gainPct):"—"}</div></div>`;
 
-  const container = document.querySelector("#purchase-table")?.closest(".panel");
+  const container = document.getElementById("purchase-history-panel");
   if (!withPL.length) {
     if (container) container.innerHTML = `<div class="empty">No purchases logged yet. <a href="#" onclick="lockPurchases(); return false;" style="color:#C98A3B; margin-left: 10px;">🔒 Lock tab</a></div>`;
     return;
