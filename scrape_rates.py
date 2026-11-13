@@ -3,19 +3,27 @@ Bullion Ledger — daily rate scraper (chandukakasaraf.in)
 Appends / updates today's row in bullion_history.csv at the repo root.
 Run by .github/workflows/scrape-rates.yml on a daily cron.
 
-Designed to be extended: add new metals/assets by adding a new `grab(...)`
-call and a new column in FIELDNAMES + the row dict below.
+Designed to be extended: add new metals/assets by adding an entry to LABELS
+and a new column in FIELDNAMES + the row dict below.
 """
 
 import re
 import csv
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 import requests
 from bs4 import BeautifulSoup
 
 URL = "https://chandukakasaraf.in/todays-gold-rate/"
 CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bullion_history.csv")
+IST = ZoneInfo("Asia/Kolkata")
+
+# A new day's price may not differ from the last stored row by more than this
+# (guards against a mis-parsed number silently entering your history).
+# To accept a genuine big move, run with  BULLION_ALLOW_JUMP=1.
+MAX_MOVE = 0.25
 
 HEADERS = {
     "User-Agent": (
@@ -36,6 +44,21 @@ FIELDNAMES = [
     "diamond_per_carat",  # placeholder column — populate once a diamond price source is added
 ]
 
+# Each label must be followed *immediately* by "<currency><amount> PER 1 <unit>".
+# Anchoring on that (instead of an open-ended ".*?") means a product name such as
+# "24kt Gold Vedhani Plain 5 gm", or a menu item such as "Silver", can never be
+# mistaken for a rate.
+CUR = r"(?:₹|Rs\.?|INR)"
+NUM = r"([\d,]+(?:\.\d+)?)"
+UNIT = r"(?:PER|/)\s*1?\s*(GM|G|GRAM|KG)\b"
+LABELS = {
+    "gold_18kt":    r"18\s*(?:KT|K|Karat)\s*Gold",
+    "gold_22kt":    r"22\s*(?:KT|K|Karat)\s*Gold",
+    "gold_24kt":    r"24\s*(?:KT|K|Karat)\s*Gold",
+    "platinum_950": r"Platinum[\s\-]*950",
+    "silver":       r"Silver",
+}
+
 
 def fetch_page() -> str:
     resp = requests.get(URL, headers=HEADERS, timeout=20)
@@ -44,45 +67,31 @@ def fetch_page() -> str:
     return resp.text
 
 
+def _per_gram(text: str, label: str):
+    """First '<label> <currency><amount> PER 1 <unit>' in the text, as ₹ per gram."""
+    m = re.search(rf"{label}\W{{0,12}}?{CUR}\s*{NUM}\s*{UNIT}", text, re.IGNORECASE)
+    if not m:
+        return None
+    amount = float(m.group(1).replace(",", ""))
+    unit = m.group(2).upper()
+    return amount / 1000 if unit == "KG" else amount   # the site quotes silver per KG
+
+
 def extract_rates(html: str) -> dict:
     soup = BeautifulSoup(html, "html.parser")
-    
-    # Extract plain text cleanly while preserving spaces between HTML nodes
+    # separator keeps neighbouring cells apart; get_text() already skips <script>/<style>
     text = soup.get_text(separator=" ", strip=True)
 
-    def grab(pattern):
-        m = re.search(pattern, text, re.IGNORECASE)
-        if not m:
-            return None
-        return float(m.group(1).replace(",", ""))
+    ts = re.search(r"Updated\s*On\s*:?\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})", text, re.IGNORECASE)
+    site_updated_at = f"{ts.group(1)} {ts.group(2)}" if ts else None
 
-    # Updated pattern to catch variants of updated timestamps
-    updated_match = re.search(
-        r"Updated\s*(?:On)?:?\s*(\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4})?\s*(\d{2}:\d{2}:\d{2})?", 
-        text, 
-        re.IGNORECASE
-    )
-    site_updated_at = (
-        f"{updated_match.group(1)} {updated_match.group(2)}".strip() 
-        if updated_match and (updated_match.group(1) or updated_match.group(2)) 
-        else None
-    )
+    found = {key: _per_gram(text, pattern) for key, pattern in LABELS.items()}
 
-    # Robust flexible regex to match metal labels regardless of intervening HTML tags or symbols
-    g18 = grab(r"18\s*(?:KT|K|Karat).*?(?:₹|Rs\.?|INR)?\s*([\d,]+(?:\.\d+)?)")
-    g22 = grab(r"22\s*(?:KT|K|Karat).*?(?:₹|Rs\.?|INR)?\s*([\d,]+(?:\.\d+)?)")
-    g24 = grab(r"24\s*(?:KT|K|Karat).*?(?:₹|Rs\.?|INR)?\s*([\d,]+(?:\.\d+)?)")
-    platinum = grab(r"Platinum\s*(?:950)?.*?(?:₹|Rs\.?|INR)?\s*([\d,]+(?:\.\d+)?)")
-    silver_kg = grab(r"Silver.*?(?:₹|Rs\.?|INR)?\s*([\d,]+(?:\.\d+)?)\s*(?:per|/)?\s*(?:1\s*kg|kg|1000\s*g)?")
-
-    missing = [name for name, val in
-               [("18KT", g18), ("22KT", g22), ("24KT", g24), ("Silver/kg", silver_kg)]
-               if val is None]
-               
+    required = {"18KT": "gold_18kt", "22KT": "gold_22kt", "24KT": "gold_24kt", "Silver": "silver"}
+    missing = [name for name, key in required.items() if found[key] is None]
     if missing:
-        snippet = text[:800]
         print("---- DEBUG: first 800 chars of extracted text ----")
-        print(snippet)
+        print(text[:800])
         print("---- END DEBUG ----")
         debug_path = os.path.join(os.path.dirname(CSV_PATH), "debug_last_response.html")
         with open(debug_path, "w", encoding="utf-8") as f:
@@ -96,12 +105,31 @@ def extract_rates(html: str) -> dict:
 
     return {
         "site_updated_at": site_updated_at,
-        "gold_24kt": g24,
-        "gold_22kt": g22,
-        "gold_18kt": g18,
-        "platinum_950": platinum,
-        "silver_per_gram": round(silver_kg / 1000, 2) if silver_kg else None,
+        "gold_24kt": found["gold_24kt"],
+        "gold_22kt": found["gold_22kt"],
+        "gold_18kt": found["gold_18kt"],
+        "platinum_950": found["platinum_950"],
+        "silver_per_gram": round(found["silver"], 2),
     }
+
+
+def validate(rates: dict, previous_row: dict | None) -> None:
+    """Refuse to store numbers that are structurally impossible or wildly off."""
+    g24, g22, g18 = rates["gold_24kt"], rates["gold_22kt"], rates["gold_18kt"]
+    if not (g24 > g22 > g18 > 0):
+        raise ValueError(f"Gold purities out of order (24K={g24}, 22K={g22}, 18K={g18}) — likely a mis-parse.")
+
+    if previous_row and os.environ.get("BULLION_ALLOW_JUMP") != "1":
+        for key in ("gold_24kt", "gold_22kt", "gold_18kt", "silver_per_gram"):
+            try:
+                prev = float(previous_row[key])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if prev > 0 and abs(rates[key] - prev) / prev > MAX_MOVE:
+                raise ValueError(
+                    f"{key} moved {rates[key]} vs previous {prev} (>{MAX_MOVE:.0%}). "
+                    f"If this is real, rerun with BULLION_ALLOW_JUMP=1; otherwise check the parser."
+                )
 
 
 def load_existing_rows() -> list:
@@ -120,7 +148,7 @@ def save_rows(rows: list) -> None:
 
 def upsert_today(rates: dict) -> dict:
     now = datetime.now(timezone.utc)
-    today = now.strftime("%Y-%m-%d")
+    today = now.astimezone(IST).strftime("%Y-%m-%d")   # Indian rates -> Indian calendar date
     row = {
         "date": today,
         "scraped_at_utc": now.isoformat(timespec="seconds"),
@@ -134,6 +162,10 @@ def upsert_today(rates: dict) -> dict:
     }
 
     rows = load_existing_rows()
+    # compare against the last row from an *earlier* day, not today's own earlier scrape
+    previous = next((r for r in reversed(rows) if r.get("date") != today), None)
+    validate(rates, previous)
+
     if rows and rows[-1]["date"] == today:
         rows[-1] = row
     else:
