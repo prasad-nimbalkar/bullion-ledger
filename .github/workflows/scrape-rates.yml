@@ -1,5 +1,9 @@
 name: Daily Bullion Rate Scrape
 
+concurrency:
+  group: bullion-ledger-writes
+  cancel-in-progress: false
+
 on:
   schedule:
     # 06:00 UTC = 11:30 AM IST, daily. GitHub may delay a few minutes under load — normal.
@@ -32,7 +36,13 @@ jobs:
           git config user.name "bullion-ledger-bot"
           git config user.email "actions@users.noreply.github.com"
           git add bullion_history.csv
-          git diff --staged --quiet || git commit -m "Update bullion rates $(date -u +'%Y-%m-%d')"
-          git push
+          if git diff --staged --quiet; then echo "No changes to commit"; exit 0; fi
+          git commit -m "Update bullion rates $(date -u +'%Y-%m-%d')"
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "Push failed after 3 attempts"; exit 1
       # Note: no separate deploy step needed — GitHub Pages serves the repo's
       # main branch directly, so index.html picks up the new CSV on next page load.

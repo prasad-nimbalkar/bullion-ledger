@@ -5,6 +5,10 @@ name: Ingest Manual Price Entry
 # or filed by hand in the same format). Parses the issue body, writes/updates
 # that date's row in bullion_history.csv, commits it, and closes the issue.
 
+concurrency:
+  group: bullion-ledger-writes
+  cancel-in-progress: false
+
 on:
   issues:
     types: [opened]
@@ -85,13 +89,18 @@ jobs:
             core.setOutput("entry_date", date);
 
       - name: Commit updated CSV
-        if: steps.parse.outputs.success == 'true'
         run: |
           git config user.name "bullion-ledger-bot"
           git config user.email "actions@users.noreply.github.com"
           git add bullion_history.csv
-          git commit -m "Manual price entry for ${{ steps.parse.outputs.entry_date }} (closes issue #${{ github.event.issue.number }})"
-          git push
+          if git diff --staged --quiet; then echo "No changes to commit"; exit 0; fi
+          git commit -m "Update bullion rates $(date -u +'%Y-%m-%d')"
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          echo "Push failed after 3 attempts"; exit 1
 
       - name: Comment and close issue
         if: steps.parse.outputs.success == 'true'
