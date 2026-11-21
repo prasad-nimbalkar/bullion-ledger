@@ -6,16 +6,20 @@ concurrency:
 
 on:
   schedule:
-    # 06:00 UTC = 11:30 AM IST, daily. GitHub may delay a few minutes under load — normal.
-    - cron: "0 6 * * *"
-  workflow_dispatch: {}   # manual "Run workflow" button in the Actions tab
+    # 10:47 AM IST
+    # 10 = hour (10 AM), 47 = minute (47th minute), * = every day, * = every month, 1-6 = weekday (exclude Sunday)
+    - cron: "47 10 * * 1-6"
+      timezone: "Asia/Kolkata"
+  workflow_dispatch: {}
 
 permissions:
-  contents: write         # lets the workflow commit bullion_history.csv back to the repo
+  contents: write
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+
     steps:
       - name: Check out repo
         uses: actions/checkout@v5
@@ -44,5 +48,3 @@ jobs:
             sleep 5
           done
           echo "Push failed after 3 attempts"; exit 1
-      # Note: no separate deploy step needed — GitHub Pages serves the repo's
-      # main branch directly, so index.html picks up the new CSV on next page load.
