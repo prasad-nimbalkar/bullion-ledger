@@ -171,7 +171,7 @@ def extract_rates(payload):
         )
 
     # Normalize the WebSocket silver value to ₹ per gram
-    silver_per_gram = round(silver / 1_000_000, 3)
+    silver_per_gram = round(silver / 1_000, 2)
 
     # Assumes the WebSocket silver value is per gram; convert to per kg.
     return {
