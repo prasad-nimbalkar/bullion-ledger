@@ -198,7 +198,7 @@ def validate(rates: dict, previous_row: dict | None):
         )
 
     if previous_row and os.environ.get("BULLION_ALLOW_JUMP") != "1":
-        for key in ("gold_24kt", "gold_22kt", "gold_18kt", "silver_per_kg"):
+        for key in ("gold_24kt", "gold_22kt", "gold_18kt", "silver_per_gram"):
             try:
                 prev = float(previous_row[key])
             except (KeyError, TypeError, ValueError):
