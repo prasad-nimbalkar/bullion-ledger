@@ -6,10 +6,9 @@ concurrency:
 
 on:
   schedule:
-    # 10:47 AM IST
-    # 10 = hour (10 AM), 47 = minute (47th minute), * = every day, * = every month, 1-6 = weekday (exclude Sunday)
-    - cron: "47 10 * * 1-6"
-      timezone: "Asia/Kolkata"
+    # 05:07 UTC = 10:37 AM IST.
+    # 05 = hour, 07 = minute, * = every day, * = every month, 1-6 = weekday (exclude Sunday)
+    - cron: "07 5 * * 1-6"
   workflow_dispatch: {}
 
 permissions:
