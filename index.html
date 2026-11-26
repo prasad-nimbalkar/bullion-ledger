@@ -111,6 +111,17 @@
   .msg.error { background: rgba(180,85,59,0.12); border: 1px solid var(--rust); color: var(--rust); }
   .msg.success { background: rgba(110,143,92,0.12); border: 1px solid var(--sage); color: var(--sage); }
   .empty { color: var(--cream-dim); font-size: 13px; padding: 14px; }
+  /* Purchase holdings metrics + collapsible asset breakdown */
+  .holdings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+  .holding-metric { background:var(--panel); border:1px solid var(--hairline); border-radius:8px; padding:14px 16px; }
+  .holding-value { font-family:'Fraunces',serif; font-size:22px; margin-top:6px; font-variant-numeric:tabular-nums; }
+  .asset-breakdown { border:1px solid var(--hairline); border-radius:8px; overflow:hidden; margin-bottom:18px; }
+  .asset-breakdown summary { cursor:pointer; list-style:none; padding:13px 16px; font-size:12px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--gold-bright); }
+  .asset-breakdown summary::-webkit-details-marker { display:none; }
+  .asset-breakdown summary::after { content:'＋'; float:right; color:var(--cream-dim); }
+  .asset-breakdown[open] summary::after { content:'－'; }
+  .asset-breakdown-content { padding:0 12px 12px; }
+  @media(max-width:480px) { .holdings-grid { gap:8px; } .holding-value { font-size:19px; } }
   #sync-modal-overlay.open { display: flex !important; }
 </style>
 </head>
@@ -1244,11 +1255,40 @@ function renderPurchases() {
   const gain = currentValue - totalInvested;
   const gainPct = totalInvested ? (gain / totalInvested) * 100 : null;
 
+  const goldPurchases = purchasesDecrypted.filter(p => p.asset === "Gold");
+  const silverPurchases = purchasesDecrypted.filter(p => p.asset === "Silver");
+  const goldQty = goldPurchases.reduce((sum,p) => sum + (Number(p.qty)||0), 0);
+  const silverQty = silverPurchases.reduce((sum,p) => sum + (Number(p.qty)||0), 0);
+  const goldCost = goldPurchases.reduce((sum,p) => sum + (Number(p.total)||0), 0);
+  const avgGoldPrice = goldQty ? goldCost / goldQty : null;
+  const breakdownRows = [
+    {label:"Gold 24K", list:goldPurchases.filter(p=>p.purity==="24K")},
+    {label:"Gold 22K", list:goldPurchases.filter(p=>p.purity==="22K")},
+    {label:"Gold 18K", list:goldPurchases.filter(p=>p.purity==="18K")},
+    {label:"Silver", list:silverPurchases}
+  ].map(group => {
+    const qty=group.list.reduce((sum,p)=>sum+(Number(p.qty)||0),0);
+    const cost=group.list.reduce((sum,p)=>sum+(Number(p.total)||0),0);
+    return `<tr><td>${group.label}</td><td>${qty.toFixed(3)} g</td><td>${fmtINR(cost)}</td><td>${qty?fmtINR(cost/qty,2)+"/g":"—"}</td></tr>`;
+  }).join("");
+
   document.getElementById("portfolio-summary").innerHTML = `
-    <div class="panel card"><div class="label">Total Invested</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;">${fmtINR(totalInvested)}</div></div>
-    <div class="panel card"><div class="label">Current Value</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;">${fmtINR(currentValue)}</div></div>
-    <div class="panel card"><div class="label">Unrealized P/L</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;color:${gain>=0?'#6E8F5C':'#B4553B'}">${fmtINR(gain)}</div></div>
-    <div class="panel card"><div class="label">Return %</div><div style="font-family:'Fraunces',serif;font-size:20px;margin-top:6px;color:${gain>=0?'#6E8F5C':'#B4553B'}">${gainPct!==null?fmtPct(gainPct):"—"}</div></div>`;
+    <div class="holdings-grid">
+      <div class="holding-metric"><div class="label">Total Gold</div><div class="holding-value">${goldQty.toFixed(3)} g</div></div>
+      <div class="holding-metric"><div class="label">Total Silver</div><div class="holding-value">${silverQty.toFixed(3)} g</div></div>
+      <div class="holding-metric"><div class="label">Average Buy Price <span style="font-size:10px;letter-spacing:0;color:var(--cream-dim);text-transform:none;">(Gold)</span></div><div class="holding-value">${avgGoldPrice!==null?fmtINR(avgGoldPrice,2)+"/g":"—"}</div></div>
+      <div class="holding-metric"><div class="label">Transactions</div><div class="holding-value">${purchasesDecrypted.length}</div></div>
+    </div>
+    <details class="asset-breakdown">
+      <summary>Asset-wise Breakdown</summary>
+      <div class="asset-breakdown-content table-wrap"><table><thead><tr><th>Asset</th><th>Qty</th><th>Total Cost</th><th>Avg Buy / g</th></tr></thead><tbody>${breakdownRows}</tbody></table></div>
+    </details>
+    <div class="holdings-grid">
+      <div class="holding-metric"><div class="label">Total Invested</div><div class="holding-value">${fmtINR(totalInvested)}</div></div>
+      <div class="holding-metric"><div class="label">Current Value</div><div class="holding-value">${fmtINR(currentValue)}</div></div>
+      <div class="holding-metric"><div class="label">Unrealized P/L</div><div class="holding-value" style="color:${gain>=0?'#6E8F5C':'#B4553B'}">${fmtINR(gain)}</div></div>
+      <div class="holding-metric"><div class="label">Return %</div><div class="holding-value" style="color:${gain>=0?'#6E8F5C':'#B4553B'}">${gainPct!==null?fmtPct(gainPct):"—"}</div></div>
+    </div>`;
 
   const container = document.getElementById("purchase-history-panel");
   if (!withPL.length) {
